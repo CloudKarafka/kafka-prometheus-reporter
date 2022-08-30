@@ -23,9 +23,6 @@ jobs:
         with:
           version: '2021.09.25'
 
-      - name: Clojure version
-        run: clojure --version
-
       - name: Run clj-kondo
         run: clj-kondo --lint src
 
