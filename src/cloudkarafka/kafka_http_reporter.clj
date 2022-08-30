@@ -4,7 +4,7 @@
             [clojure.java.io :as io]
             [aleph.http :as http]
             [jsonista.core :as json]
-            [compojure.core :refer :all]
+            [compojure.core :refer [routes GET]]
             [compojure.route :as route]
             [ring.middleware.params :as params]
             [clojure.java.jmx :as jmx])
