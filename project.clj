@@ -8,6 +8,5 @@
                                        [org.apache.kafka/kafka-clients "3.2.0"]]}}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.clojure/java.jmx "1.0.0"]
-                 [metosin/jsonista "0.3.6"]
                  [aleph "0.4.7"]
                  [compojure "1.7.0"]])

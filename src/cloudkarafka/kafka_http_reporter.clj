@@ -3,7 +3,6 @@
             [clojure.walk :as w]
             [clojure.java.io :as io]
             [aleph.http :as http]
-            [jsonista.core :as json]
             [compojure.core :refer [routes GET]]
             [compojure.route :as route]
             [ring.middleware.params :as params]
@@ -14,18 +13,22 @@
 
 (set! *warn-on-reflection* true)
 
-(def mapper (json/object-mapper {:decode-key-fn true, :encode-key-fn true}))
-
 (def state (atom nil))
 
-(def bean-keys [:Value :Count :MeanRate :OneMinuteRate :FiveMinuteRate :FifteenMinuteRate
-                :Max :Min :Mean :50thPercentile :99thPercentile :999thPercentile
-                :connection-count :connection-creation-rate])
+(def bean-values [:Value :Count :MeanRate :OneMinuteRate :FiveMinuteRate :FifteenMinuteRate
+                  :Max :Min :Mean :50thPercentile :99thPercentile :999thPercentile
+                  :connection-count :connection-creation-rate])
 
 (defn key->attr [[k v]]
   (case k
-    (:topic :partition :listener) [k v]
+    (:topic :partition :listener :request :processor :version :cipher :protocol) [k v]
+    (:BrokerId :broker-id) [:broker_id v]
+    :fetcher-id [:fetcher_id v]
     :networkProcessor [:network_processor v]
+    :delayedOperation [:operation v]
+    :clientId [:client_id v]
+    :clientSoftwareName [:client_software v]
+    :clientSoftwareVersion [:client_version v]
     nil))
 
 (defn keys->attrs [keys]
@@ -39,13 +42,13 @@
       str/lower-case
       (str/replace  #"[^a-zA-Z_:]" "_")))
 
-(defn format-bean-prom [^javax.management.ObjectName mbean]
+(defn format-bean [^javax.management.ObjectName mbean]
   (try
     (let [prefix (str/replace (.getDomain mbean) #"\." "_")
           keys (w/keywordize-keys (into {} (.getKeyPropertyList mbean)))
           attrs (keys->attrs keys)
           bean (jmx/objects->data (jmx/mbean mbean))]
-      (for [[key value] (select-keys bean bean-keys)
+      (for [[key value] (select-keys bean bean-values)
             :let  [attrs (assoc attrs :key key)]]
         (str prefix
              "_"
@@ -65,35 +68,13 @@
     (catch javax.management.InstanceNotFoundException _e
       (println "not found " (.getCanonicalName mbean)))))
 
-(defn format-bean-json [^javax.management.ObjectName mbean]
-  (try
-    (let [keys (w/keywordize-keys (into {} (.getKeyPropertyList mbean)))
-          attrs (keys->attrs keys)
-          bean (jmx/objects->data (jmx/mbean mbean))]
-      (for [[key value] (select-keys bean bean-keys)
-            :let  [attrs (assoc attrs :key key)]]
-        (assoc attrs
-               :type (:type keys)
-               :name (:name keys)
-               :value value
-               :key key)))
-    (catch javax.management.InstanceNotFoundException _e
-      (println "not found " (.getCanonicalName mbean)))))
-
-(defn jmx-prometheus [^String bean]
+(defn read-jmx [^String bean]
   (try
     (if (.contains bean "*")
-      (mapcat #(format-bean-prom  %) (jmx/mbean-names bean))
-      (format-bean-prom (jmx/as-object-name bean)))
-    (catch javax.management.InstanceNotFoundException _e
-      (println "not found " bean))))
-
-
-(defn jmx-json [^String bean]
-  (try
-    (if (.contains bean "*")
-      (mapcat #(format-bean-json  %) (jmx/mbean-names bean))
-      (format-bean-json (jmx/as-object-name bean)))
+      (mapcat #(format-bean  %) (jmx/mbean-names bean))
+      (format-bean (jmx/as-object-name bean)))
+    (catch javax.management.MalformedObjectNameException _e
+      (println "bad bean name" bean))
     (catch javax.management.InstanceNotFoundException _e
       (println "not found " bean))))
 
@@ -112,24 +93,8 @@
              {:status 200
               :headers {"content-type" "text/plain"}
               :body (->> beans
-                         (map jmx-prometheus)
+                         (map read-jmx)
                          flatten)}
-             (catch Exception e
-               (println e)
-               {:status 500 :headers {"content-type" "text/plain"} :body "internal server error"}))
-           (route/not-found "metrics disabled, no metrics file found")))
-
-
-    (GET "/json" []
-         (if-let [beans (:metrics @state)]
-           (try
-             {:status 200
-              :headers {"content-type" "application/json"}
-              :body (->> beans
-                         (map jmx-json)
-                         flatten
-                         (remove nil?)
-                         json/write-value-as-string)}
              (catch Exception e
                (println e)
                {:status 500 :headers {"content-type" "text/plain"} :body "internal server error"}))
