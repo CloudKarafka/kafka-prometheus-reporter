@@ -1,0 +1,33 @@
+on:
+  push:
+    tags:
+      - 'v*'
+
+name: Create Release
+jobs:
+  build:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: build artifacts
+        uses: oxr463/setup-leiningen@0.0.1
+        with:
+          exec: lein uberjar
+      - name: upload artifact
+        uses: alexellis/upload-assets@0.2.2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          asset_paths: '["./target/kafka-http-reporter-*-standalone.jar"]'
