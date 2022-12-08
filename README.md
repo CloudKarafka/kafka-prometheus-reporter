@@ -38,7 +38,7 @@ The plugin supports wildcards `*` for some parameters, so you can get metrics fo
 
 * Update the version number in `project.clj`
 * Commit the change and tag it with the same version
-* Push to github, travis CI will generate the release artifact
+* Push to Github
 
 ## Versioning
 
