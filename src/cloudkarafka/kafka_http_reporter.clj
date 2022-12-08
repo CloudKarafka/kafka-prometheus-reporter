@@ -65,8 +65,7 @@
              " "
              value
              "\n")))
-    (catch javax.management.InstanceNotFoundException _e
-      (println "not found " (.getCanonicalName mbean)))))
+    (catch javax.management.InstanceNotFoundException _e)))
 
 (defn read-jmx [^String bean]
   (try
@@ -83,15 +82,15 @@
    (routes
     (GET "/kafka-version" []
          {:status 200
-          :headers {"content-type" "text/plain"}
-          :body ""; (org.apache.kafka.common.utils.AppInfoParser/getVersion)
+          :headers {"Content-Type" "text/plain"}
+          :body (org.apache.kafka.common.utils.AppInfoParser/getVersion)
           })
 
     (GET "/metrics" []
          (if-let [beans (:metrics @state)]
            (try
              {:status 200
-              :headers {"content-type" "text/plain"}
+              :headers {"Content-Type" "text/plain", "Cache-Control" "max-age=10, must-revalidate"}
               :body (->> beans
                          (map read-jmx)
                          flatten)}
